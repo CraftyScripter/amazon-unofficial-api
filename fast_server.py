@@ -1,9 +1,19 @@
 import os
+import threading
+import time
+import requests
 from fastapi import FastAPI, Query, HTTPException
 from amazon import AmazonScraper
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 app = FastAPI()
 scraper = AmazonScraper()
+
+RENDER_URL = os.getenv("RENDER_URL")
+PORT = int(os.getenv("PORT", 10000))
 
 @app.get("/")
 def root():
@@ -26,8 +36,23 @@ def get_product(product_id: str):
     else:
         raise HTTPException(status_code=404, detail="Product not found or error occurred")
 
+
+# ----------------- Keep-alive function -----------------
+def keep_alive():
+    while True:
+        try:
+            requests.get(RENDER_URL, timeout=10)
+            print("Pinged self to prevent sleep")
+        except Exception as e:
+            print("Error pinging self:", e)
+        time.sleep(30 * 60)  # 30 minutes delay
+
+# Start the keep-alive thread when server starts
+threading.Thread(target=keep_alive, daemon=True).start()
+# -------------------------------------------------------
+
+
 # Dynamic port handling for Render
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("fast_server:app", host="0.0.0.0", port=port)
+    uvicorn.run("fast_server:app", host="0.0.0.0", port=PORT)
